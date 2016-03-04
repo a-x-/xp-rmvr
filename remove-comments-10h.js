@@ -43,6 +43,10 @@ var removeComments = (() => {'use strict';
         let convertSymbols = (symbolsRaw) =>
             symbolsRaw.map(symbol => symbol === '\\n' ? '\n' : symbol);
 
+        // Finite-state machine's custom DSL
+        // left head col: departure states
+        // top head row: input symbols
+        // cells: new states
         let stateTransDSL = `
                     \'    "     /     *    \\    \\n
         N           lSTR  llSTR COMM_ _    ESC    _
