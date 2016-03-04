@@ -17,7 +17,8 @@ var removeComments = (() => {'use strict';
         N: i++, // nope
         _: i++, // keep current state (fake state)
         
-        COMM_: i++, // line-comment candidate
+        // line-comment candidate
+        COMM_: i++,
 
         // liny-comment
         LCOMM: i++,
@@ -33,9 +34,10 @@ var removeComments = (() => {'use strict';
         ERR: i++,
     };
 
-    let s_ = _.invert(s); // id to string representation
+    let s_ = _.invert(s); // id to string state representation
 
-    // matrix json { symbol: { currState: newState,,, },,, }
+    // matrix: json { symbol: { currState: newState,,, },,, }
+    // which state will select on given state and symbol
     let symbolToState = (() => {
 
         let convertSymbols = (symbolsRaw) =>
@@ -53,12 +55,12 @@ var removeComments = (() => {'use strict';
         llSTR       _     N     _     _     ESC   ERR
         `.trim().split(/\n/);
         
-        let stateTransRaw    = _.drop(stateTransDSL); // del left head col
-        let symbolsRaw       = stateTransDSL[0].trim().split(/\s+/);
-        let symbols          = convertSymbols(symbolsRaw);
-        let statesTable      = stateTransRaw.map(row=>row.trim().split(/\s+/));
-        let statesCollection = statesTable.map(row    => row[0]);
-        let statesMatrix     = statesTable.map(row    => _.drop(row))
+        let stateTransRaw    = _.drop(stateTransDSL);                   // del head row
+        let symbolsRaw       = stateTransDSL[0].trim().split(/\s+/);    // head row
+        let symbols          = convertSymbols(symbolsRaw);              // \\n as \n
+        let statesTable      = stateTransRaw.map(row  => row.trim().split(/\s+/));
+        let statesCollection = statesTable.map(row    => row[0]);       // left head col
+        let statesMatrix     = statesTable.map(row    => _.drop(row))   // without left head col
 
         return _(symbols).invert().mapValues((i, symbol) => 
             _(statesCollection).invert().mapValues((j, state) =>
@@ -68,8 +70,8 @@ var removeComments = (() => {'use strict';
 
     })();
 
-    let state = s.N;
-    let prevUnclassifiedChars = [];
+    let state = s.N; // NOPE state
+    let prevUnclassifiedChars = []; // prev symbols candidates to classify
 
     function CommentsRemover () {
 
@@ -97,13 +99,14 @@ var removeComments = (() => {'use strict';
             break;
             case(s.BCOMM):
             case(s.LCOMM):
-                this.clearPrevChars();
+                this.clearPrevChars(); // prev candidates detected as a comments
             break;
             case(s.N):
             case(s.ESC):
             case(s.lSTR):
             case(s.llSTR):
             case(s.ERR):
+                // prev candidates detected as a some useful code
                 if (prevUnclassifiedChars.length) {
                     this.printPrevChars().clearPrevChars();
                 }
@@ -120,7 +123,7 @@ var removeComments = (() => {'use strict';
         };
 
         this.calcNewState = (char) => {
-            // Может быть фейковым состоянием (_ = keep state)
+            // May be a fake state (_ = keep state)
             let stateRaw = symbolToState[char]
                 ? this.stateToConst(symbolToState[char][s_[this.state]])
                 : this.state;
@@ -135,15 +138,14 @@ var removeComments = (() => {'use strict';
         this.toValue = () => {
             let output = this.output;
             this.output = '';
-            // Строки содержащие исключительно комментарии
-            // оставляют после себя лишние \n
+            // Full-comment lines, keep after itself extra \n symbols
             let outputWithoutEmptyLines = output.replace(/^\s*$\n/gm, '');
             return outputWithoutEmptyLines;
         };
 
     }
 
-    let removr = new CommentsRemover;
+    let removr = new CommentsRemover; // all lambda-methods are auto-binded to CommentsRemover!
 
     let eachChar = (string, callback) => {
         for (let i = 0, len = string.length; i < len; ++i) {
